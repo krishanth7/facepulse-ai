@@ -192,5 +192,4 @@ Licensed under the **MIT License**. See [LICENSE](LICENSE) for full details.
 <p align="center">
   Developed with precision & 💎 by <b><a href="https://www.instagram.com/krishanth.ai">Krishanth</a></b>
   <br/>
-  <a href="https://www.instagram.com/krishanth.ai">@krishanth.ai</a>
 </p>
