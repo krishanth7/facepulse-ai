@@ -6,11 +6,67 @@ import { DetectionResult } from '@/ai/emotionEngine';
 
 interface CameraViewProps {
     videoRef: React.RefObject<HTMLVideoElement | null>;
-    lastResult: DetectionResult | null;
+    results: DetectionResult[];          // Phase 2: array of all subjects
+    lastResult: DetectionResult | null;  // Primary (first) subject
     isStreaming: boolean;
 }
 
-const CameraView: React.FC<CameraViewProps> = ({ videoRef, lastResult, isStreaming }) => {
+// Per-subject HUD colors for up to 6 concurrent subjects
+const SUBJECT_COLORS = [
+    { stroke: '#3b82f6', fill: 'rgba(59,130,246,0.1)', glow: 'rgba(59,130,246,0.5)', label: 'SUBJECT 01' },
+    { stroke: '#10b981', fill: 'rgba(16,185,129,0.1)', glow: 'rgba(16,185,129,0.5)', label: 'SUBJECT 02' },
+    { stroke: '#f59e0b', fill: 'rgba(245,158,11,0.1)', glow: 'rgba(245,158,11,0.5)', label: 'SUBJECT 03' },
+    { stroke: '#8b5cf6', fill: 'rgba(139,92,246,0.1)', glow: 'rgba(139,92,246,0.5)', label: 'SUBJECT 04' },
+    { stroke: '#ef4444', fill: 'rgba(239,68,68,0.1)', glow: 'rgba(239,68,68,0.5)', label: 'SUBJECT 05' },
+    { stroke: '#ec4899', fill: 'rgba(236,72,153,0.1)', glow: 'rgba(236,72,153,0.5)', label: 'SUBJECT 06' },
+];
+
+const drawSubjectHUD = (
+    ctx: CanvasRenderingContext2D,
+    result: DetectionResult,
+    colorSet: typeof SUBJECT_COLORS[0]
+) => {
+    const { box } = result;
+    const { x, y, width, height } = box;
+    const cornerSize = Math.min(width, height) * 0.18;
+
+    ctx.strokeStyle = colorSet.stroke;
+    ctx.lineWidth = 3;
+    ctx.shadowBlur = 12;
+    ctx.shadowColor = colorSet.glow;
+
+    // Corners only
+    const corners: [number, number, number, number, number, number][] = [
+        [x, y + cornerSize, x, y, x + cornerSize, y],
+        [x + width - cornerSize, y, x + width, y, x + width, y + cornerSize],
+        [x, y + height - cornerSize, x, y + height, x + cornerSize, y + height],
+        [x + width - cornerSize, y + height, x + width, y + height, x + width, y + height - cornerSize],
+    ];
+
+    corners.forEach(([x1, y1, x2, y2, x3, y3]) => {
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.lineTo(x3, y3);
+        ctx.stroke();
+    });
+
+    // Fill
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = colorSet.fill;
+    ctx.fillRect(x, y, width, height);
+
+    // Label bar
+    ctx.font = 'bold 13px "Space Mono", monospace';
+    const label = `${colorSet.label} | ${result.dominantEmotion.toUpperCase()} | ${(result.confidence * 100).toFixed(0)}%`;
+    const textWidth = ctx.measureText(label).width;
+    ctx.fillStyle = colorSet.stroke;
+    ctx.fillRect(x, y - 24, textWidth + 14, 20);
+    ctx.fillStyle = 'white';
+    ctx.fillText(label, x + 7, y - 10);
+};
+
+const CameraView: React.FC<CameraViewProps> = ({ videoRef, results, lastResult, isStreaming }) => {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
     useEffect(() => {
@@ -18,7 +74,6 @@ const CameraView: React.FC<CameraViewProps> = ({ videoRef, lastResult, isStreami
         const ctx = canvasRef.current.getContext('2d');
         if (!ctx) return;
 
-        // Sync canvas display size with video element
         const video = videoRef.current;
         const canvas = canvasRef.current;
 
@@ -29,77 +84,23 @@ const CameraView: React.FC<CameraViewProps> = ({ videoRef, lastResult, isStreami
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        if (!lastResult) return;
-
-        const { box } = lastResult;
-        const color = '#3b82f6';
-        const glowColor = 'rgba(59, 130, 246, 0.5)';
-
-        // Draw HUD-style bounding box
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 4; // Bolder for better visibility
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = glowColor;
-
-        const cornerSize = Math.min(box.width, box.height) * 0.2;
-        const { x, y, width, height } = box;
-
-        // Top-left
-        ctx.beginPath();
-        ctx.moveTo(x, y + cornerSize);
-        ctx.lineTo(x, y);
-        ctx.lineTo(x + cornerSize, y);
-        ctx.stroke();
-
-        // Top-right
-        ctx.beginPath();
-        ctx.moveTo(x + width - cornerSize, y);
-        ctx.lineTo(x + width, y);
-        ctx.lineTo(x + width, y + cornerSize);
-        ctx.stroke();
-
-        // Bottom-left
-        ctx.beginPath();
-        ctx.moveTo(x, y + height - cornerSize);
-        ctx.lineTo(x, y + height);
-        ctx.lineTo(x + cornerSize, y + height);
-        ctx.stroke();
-
-        // Bottom-right
-        ctx.beginPath();
-        ctx.moveTo(x + width - cornerSize, y + height);
-        ctx.lineTo(x + width, y + height);
-        ctx.lineTo(x + width, y + height - cornerSize);
-        ctx.stroke();
-
-        // Draw subtle box fill
-        ctx.fillStyle = 'rgba(59, 130, 246, 0.1)';
-        ctx.fillRect(x, y, width, height);
-
-        // Reset shadow for text
-        ctx.shadowBlur = 0;
-
-        // Draw futuristic label
-        ctx.font = 'bold 14px "Space Mono", monospace';
-        const label = `ID: FACE_01 | ${lastResult.dominantEmotion.toUpperCase()} | ${(lastResult.confidence * 100).toFixed(1)}%`;
-        const textWidth = ctx.measureText(label).width;
-
-        ctx.fillStyle = color;
-        ctx.fillRect(x, y - 25, textWidth + 10, 20);
-
-        ctx.fillStyle = 'white';
-        ctx.fillText(label, x + 5, y - 11);
-    }, [lastResult, videoRef]);
+        // Phase 2: Draw HUD for EVERY detected face
+        results.forEach((result, index) => {
+            const colorSet = SUBJECT_COLORS[index % SUBJECT_COLORS.length];
+            drawSubjectHUD(ctx, result, colorSet);
+        });
+    }, [results, videoRef]);
 
     return (
         <div className="relative w-full aspect-video rounded-3xl overflow-hidden bg-slate-950 border border-slate-800 shadow-[0_0_50px_rgba(0,0,0,0.5)] group">
-            {/* Scanline Animation */}
-            <div className="absolute inset-0 pointer-events-none z-10 opacity-20 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_2px,3px_100%]" />
+            {/* Scanlines */}
+            <div className="absolute inset-0 pointer-events-none z-10 opacity-[0.07] bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(0,0,0,0.5)_2px,rgba(0,0,0,0.5)_4px)]" />
 
+            {/* Scan sweep */}
             <motion.div
                 animate={{ top: ['0%', '100%', '0%'] }}
-                transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
-                className="absolute left-0 right-0 h-[2px] bg-blue-500/30 z-20 pointer-events-none blur-sm"
+                transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
+                className="absolute left-0 right-0 h-[2px] bg-blue-500/20 z-20 pointer-events-none blur-sm"
             />
 
             {!isStreaming && (
@@ -114,47 +115,48 @@ const CameraView: React.FC<CameraViewProps> = ({ videoRef, lastResult, isStreami
                 autoPlay
                 muted
                 playsInline
-                className="w-full h-full object-cover grayscale-[0.2] brightness-110"
+                className="w-full h-full object-cover brightness-110"
             />
 
             <canvas
                 ref={canvasRef}
-                width={1280}
-                height={720}
                 className="absolute top-0 left-0 w-full h-full pointer-events-none z-40"
             />
 
-            {/* HUD Overlays */}
-            <div className="absolute top-6 left-6 z-50 flex items-start space-x-4 pointer-events-none">
+            {/* System badge */}
+            <div className="absolute top-5 left-5 z-50 pointer-events-none">
                 <div className="bg-black/60 backdrop-blur-md border border-white/10 p-3 rounded-xl">
                     <div className="flex items-center space-x-2 mb-1">
-                        <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-                        <span className="text-[10px] text-blue-400 font-bold uppercase tracking-widest">System Active</span>
+                        <div className={`w-2 h-2 rounded-full ${isStreaming ? 'bg-blue-500 animate-pulse' : 'bg-slate-600'}`} />
+                        <span className="text-[10px] text-blue-400 font-bold uppercase tracking-widest">
+                            {isStreaming ? `${results.length} Subject${results.length !== 1 ? 's' : ''} Active` : 'System Offline'}
+                        </span>
                     </div>
-                    <div className="text-xs text-white/70 font-mono italic">REC: 00:00:24:12</div>
+                    <div className="text-[10px] text-white/40 font-mono">NEURAL LINK v2.0 · MULTI-BIOMETRICS</div>
                 </div>
             </div>
 
+            {/* Live emotion panel for primary subject */}
             <AnimatePresence>
                 {lastResult && (
                     <motion.div
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: 20 }}
-                        className="absolute bottom-6 right-6 z-50 bg-blue-600/20 backdrop-blur-xl border border-blue-500/30 p-6 rounded-2xl min-w-[200px]"
+                        className="absolute bottom-5 right-5 z-50 bg-blue-600/20 backdrop-blur-xl border border-blue-500/30 p-5 rounded-2xl min-w-[190px]"
                     >
-                        <div className="text-[10px] text-blue-400 uppercase font-black tracking-[0.2em] mb-2">Subject Emotion</div>
-                        <div className="text-4xl font-black text-white capitalize mb-1 tracking-tighter">
+                        <div className="text-[9px] text-blue-400 uppercase font-black tracking-[0.2em] mb-1.5">Primary Subject</div>
+                        <div className="text-3xl font-black text-white capitalize mb-2 tracking-tighter">
                             {lastResult.dominantEmotion}
                         </div>
-                        <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden">
+                        <div className="w-full h-1 bg-white/10 rounded-full overflow-hidden mb-1">
                             <motion.div
                                 initial={{ width: 0 }}
                                 animate={{ width: `${lastResult.confidence * 100}%` }}
-                                className="h-full bg-blue-500 shadow-[0_0_10px_#3b82f6]"
+                                className="h-full bg-blue-500 shadow-[0_0_8px_#3b82f6]"
                             />
                         </div>
-                        <div className="mt-2 text-[10px] text-white/50 font-mono">CONFIDENCE: {(lastResult.confidence * 100).toFixed(2)}%</div>
+                        <div className="text-[9px] text-white/40 font-mono">CONF: {(lastResult.confidence * 100).toFixed(1)}%</div>
                     </motion.div>
                 )}
             </AnimatePresence>
