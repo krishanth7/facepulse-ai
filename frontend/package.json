@@ -1,0 +1,33 @@
+{
+  "name": "frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "node node_modules/next/dist/bin/next dev",
+    "build": "node node_modules/next/dist/bin/next build",
+    "start": "node node_modules/next/dist/bin/next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@vladmandic/face-api": "^1.7.0",
+    "axios": "^1.6.8",
+    "clsx": "^2.1.0",
+    "framer-motion": "^10.16.4",
+    "lucide-react": "^0.462.0",
+    "next": "^15.1.6",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "recharts": "^2.13.3",
+    "tailwind-merge": "^2.5.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.0.0",
+    "@types/node": "^20.17.6",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^9.15.0",
+    "eslint-config-next": "15.1.6",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.7.2"
+  }
+}

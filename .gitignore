@@ -1,0 +1,28 @@
+# Dependency directories
+node_modules/
+frontend/node_modules/
+
+# Next.js build output
+frontend/.next/
+frontend/out/
+
+# Go binaries and dependencies
+backend-go/go/
+backend-go/facepulse-ai/backend-go
+backend-go/go.mod
+backend-go/go.sum
+
+# OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Environments
+.env*
+.env.local
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.log
